@@ -208,27 +208,15 @@ async def fallback_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Hãy gõ `/` để xem danh sách lệnh, ví dụ `/login`, `/deadlines`, `/week`."
     )
 
-async def main():
+async def post_init(application: Application):
     if not TOKEN:
         raise ValueError("Chưa cấu hình TELEGRAM_TOKEN trong .env!")
         
-    logger.info("Đang khởi tạo Database PostgreSQL...")
+    logger.info("Đang khởi tạo Database SQLite...")
     await init_db()
     
     logger.info("Đang khởi động Background Scheduler...")
     start_scheduler()
-    
-    logger.info("Đang khởi động Telegram Bot (Polling mode)...")
-    application = Application.builder().token(TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start_command))
-    application.add_handler(CommandHandler("login", login_command))
-    application.add_handler(CommandHandler("logout", logout_command))
-    application.add_handler(CommandHandler("deadlines", deadlines_command))
-    application.add_handler(CommandHandler("week", week_command))
-    application.add_handler(CommandHandler("grades", grades_command))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback_message))
     
     commands = [
         BotCommand("start", "Hướng dẫn sử dụng bot"),
@@ -243,12 +231,25 @@ async def main():
     
     # Xóa webhook nếu lỡ có lưu từ trước
     await application.bot.delete_webhook()
+
+def main():
+    logger.info("Đang khởi động Telegram Bot (Polling mode)...")
+    application = Application.builder().token(TOKEN).post_init(post_init).build()
+    
+    application.add_handler(CommandHandler("start", start_command))
+    application.add_handler(CommandHandler("login", login_command))
+    application.add_handler(CommandHandler("logout", logout_command))
+    application.add_handler(CommandHandler("deadlines", deadlines_command))
+    application.add_handler(CommandHandler("week", week_command))
+    application.add_handler(CommandHandler("grades", grades_command))
+    application.add_handler(CallbackQueryHandler(button_callback))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback_message))
     
     # Chạy bot bằng phương thức Polling
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
         logger.info("Bot đã bị dừng.")
