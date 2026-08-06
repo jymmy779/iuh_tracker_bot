@@ -1,0 +1,8 @@
+# Không bao giờ commit file env và database lên Git
+.env
+*.sqlite
+*.db
+bot.log
+__pycache__/
+*.pyc
+.DS_Store
