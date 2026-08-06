@@ -17,7 +17,7 @@ async def get_moodle_token(username: str, password: str) -> str:
         "service": "moodle_mobile_app"
     }
 
-    async with httpx.AsyncClient(verify=False) as client:
+    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
         try:
             logger.info("Đang lấy token mới từ LMS...")
             response = await client.get(url, params=params)

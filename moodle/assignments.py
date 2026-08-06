@@ -21,7 +21,7 @@ async def get_assignments(course_ids: List[int], token: str) -> List[Dict]:
     for i, course_id in enumerate(course_ids):
         params[f"courseids[{i}]"] = course_id
 
-    async with httpx.AsyncClient(verify=False) as client:
+    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
@@ -55,7 +55,7 @@ async def check_submission_status(assign_id: int, token: str) -> bool:
     }
     
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
             response = await client.get(url, params=params, timeout=10.0)
             response.raise_for_status()
             data = response.json()

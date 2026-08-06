@@ -17,8 +17,9 @@ async def get_course_grades(user_id: int, token: str):
     }
     
     try:
-        response = httpx.get(f"{LMS_URL}/webservice/rest/server.php", params=params, verify=False, timeout=10.0)
-        data = response.json()
+        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            response = await client.get(f"{LMS_URL}/webservice/rest/server.php", params=params)
+            data = response.json()
         
         result = {}
         for item in data.get("grades", []):
@@ -43,8 +44,9 @@ async def get_grade_items(course_id: int, user_id: int, token: str):
     }
     
     try:
-        response = httpx.get(f"{LMS_URL}/webservice/rest/server.php", params=params, verify=False, timeout=10.0)
-        data = response.json()
+        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+            response = await client.get(f"{LMS_URL}/webservice/rest/server.php", params=params)
+            data = response.json()
         
         items = []
         usergrades = data.get("usergrades", [])

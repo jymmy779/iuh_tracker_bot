@@ -18,7 +18,7 @@ async def get_enrolled_courses(user_id: int, token: str) -> List[Dict]:
         "moodlewsrestformat": "json"
     }
 
-    async with httpx.AsyncClient(verify=False) as client:
+    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
@@ -77,7 +77,7 @@ async def get_site_info(token: str) -> Dict:
         "moodlewsrestformat": "json"
     }
 
-    async with httpx.AsyncClient(verify=False) as client:
+    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
