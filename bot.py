@@ -12,6 +12,7 @@ from tg_bot.formatter import format_deadline_message, get_done_keyboard, format_
 from moodle.auth import get_moodle_token
 from moodle.courses import get_site_info, get_enrolled_courses, get_current_semester_courses
 from moodle.grades import get_course_grades, get_grade_items
+from proxy_manager import load_proxies
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -212,6 +213,9 @@ async def post_init(application: Application):
     if not TOKEN:
         raise ValueError("Chưa cấu hình TELEGRAM_TOKEN trong .env!")
         
+    logger.info("Đang tải danh sách Proxy VN...")
+    load_proxies()
+    
     logger.info("Đang khởi tạo Database SQLite...")
     await init_db()
     

@@ -1,7 +1,7 @@
 import os
-import httpx
 import logging
 from dotenv import load_dotenv
+from proxy_manager import get_lms_client
 
 load_dotenv()
 
@@ -17,7 +17,7 @@ async def get_moodle_token(username: str, password: str) -> str:
         "service": "moodle_mobile_app"
     }
 
-    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+    async with get_lms_client(timeout=30.0) as client:
         try:
             logger.info("Đang lấy token mới từ LMS...")
             response = await client.get(url, params=params)

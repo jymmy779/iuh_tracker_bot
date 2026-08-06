@@ -1,7 +1,7 @@
-import httpx
 import logging
 from typing import List, Dict
 from .auth import LMS_URL
+from proxy_manager import get_lms_client
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ async def get_assignments(course_ids: List[int], token: str) -> List[Dict]:
     for i, course_id in enumerate(course_ids):
         params[f"courseids[{i}]"] = course_id
 
-    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+    async with get_lms_client(timeout=30.0) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
@@ -55,7 +55,7 @@ async def check_submission_status(assign_id: int, token: str) -> bool:
     }
     
     try:
-        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+        async with get_lms_client(timeout=30.0) as client:
             response = await client.get(url, params=params, timeout=10.0)
             response.raise_for_status()
             data = response.json()

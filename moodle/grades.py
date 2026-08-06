@@ -1,6 +1,6 @@
-import httpx
 from .auth import LMS_URL
 import logging
+from proxy_manager import get_lms_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ async def get_course_grades(user_id: int, token: str):
     }
     
     try:
-        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+        async with get_lms_client(timeout=30.0) as client:
             response = await client.get(f"{LMS_URL}/webservice/rest/server.php", params=params)
             data = response.json()
         
@@ -44,7 +44,7 @@ async def get_grade_items(course_id: int, user_id: int, token: str):
     }
     
     try:
-        async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+        async with get_lms_client(timeout=30.0) as client:
             response = await client.get(f"{LMS_URL}/webservice/rest/server.php", params=params)
             data = response.json()
         
