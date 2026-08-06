@@ -1,36 +1,64 @@
-import asyncpg
+import aiosqlite
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL")
-pool = None
+class DummyPool:
+    def acquire(self):
+        return _DbConnection("bot_database.sqlite")
+
+class _DbConnection:
+    def __init__(self, path):
+        self.path = path
+        self.conn = None
+        
+    async def __aenter__(self):
+        self.conn = await aiosqlite.connect(self.path)
+        self.conn.row_factory = aiosqlite.Row
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.conn.commit()
+        await self.conn.close()
+        
+    async def execute(self, query, *args):
+        query = self._convert_query(query)
+        return await self.conn.execute(query, args)
+        
+    async def fetch(self, query, *args):
+        query = self._convert_query(query)
+        async with self.conn.execute(query, args) as cursor:
+            return await cursor.fetchall()
+            
+    async def fetchrow(self, query, *args):
+        query = self._convert_query(query)
+        async with self.conn.execute(query, args) as cursor:
+            return await cursor.fetchone()
+            
+    def _convert_query(self, query):
+        # Chuyển đổi cú pháp $1, $2 của PostgreSQL sang ? của SQLite
+        return re.sub(r'\$\d+', '?', query)
+
+pool = DummyPool()
 
 async def init_db():
-    global pool
-    if not DB_URL:
-        logger.error("Chưa cấu hình DATABASE_URL trong .env!")
-        return
-        
-    pool = await asyncpg.create_pool(DB_URL)
-    
     async with pool.acquire() as db:
-        # Create tables if not exists
         await db.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                chat_id BIGINT PRIMARY KEY,
+                chat_id INTEGER PRIMARY KEY,
                 moodle_token TEXT NOT NULL,
-                lms_userid BIGINT NOT NULL
+                lms_userid INTEGER NOT NULL
             )
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS assignments (
-                id BIGINT,
-                chat_id BIGINT,
+                id INTEGER,
+                chat_id INTEGER,
                 name TEXT NOT NULL,
                 course_name TEXT NOT NULL,
-                duedate BIGINT NOT NULL,
+                duedate INTEGER NOT NULL,
                 reminded_7d BOOLEAN DEFAULT FALSE,
                 reminded_3d BOOLEAN DEFAULT FALSE,
                 reminded_1d BOOLEAN DEFAULT FALSE,
@@ -41,15 +69,15 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS grades (
-                id BIGINT,
-                chat_id BIGINT,
-                course_id BIGINT NOT NULL,
+                id INTEGER,
+                chat_id INTEGER,
+                course_id INTEGER NOT NULL,
                 item_name TEXT NOT NULL,
                 grade_formatted TEXT,
                 PRIMARY KEY (course_id, item_name, chat_id)
             )
         """)
-        logger.info("Database PostgreSQL initialized.")
+        logger.info("Database SQLite initialized.")
 
 async def add_or_update_user(chat_id: int, moodle_token: str, lms_userid: int):
     async with pool.acquire() as db:
