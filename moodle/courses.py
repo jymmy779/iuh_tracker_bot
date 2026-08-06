@@ -77,7 +77,7 @@ async def get_site_info(token: str) -> Dict:
         "moodlewsrestformat": "json"
     }
 
-    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
+    async with get_lms_client(timeout=30.0) as client:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
