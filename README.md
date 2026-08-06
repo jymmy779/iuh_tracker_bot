@@ -78,21 +78,29 @@ Phiên bản này được thiết kế theo chuẩn Cloud-Native, sử dụng W
 2. Tạo Project mới, vào phần Database Settings để lấy chuỗi kết nối (Database URL).
    - Chuỗi có dạng: `postgresql://postgres.[id]:[password]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres`
 
-### Bước 2: Chuẩn bị Hosting (Render)
-1. Đẩy code của bạn lên một repo Github.
-2. Đăng ký [Render](https://render.com), chọn **New Web Service**, kết nối với Github Repo của bạn.
-3. Cấu hình Render:
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `uvicorn bot:app --host 0.0.0.0 --port $PORT`
-   - **Environment Variables:**
-     - `TELEGRAM_TOKEN`: Token bot của bạn.
-     - `DATABASE_URL`: Chuỗi kết nối Supabase lấy ở Bước 1.
-     - `WEBHOOK_URL`: Đường link web của bạn trên Render (VD: `https://my-bot-lms.onrender.com`).
+### Bước 2: Triển khai lên VPS (Ubuntu/Linux)
+Code đã được tối ưu siêu nhẹ để chạy ngầm trên VPS (Polling mode) mà không chiếm Port web của bạn.
 
-### Bước 3: Giữ cho Bot thức & Lập lịch chạy nền
-Render Free sẽ tắt sau 15 phút không hoạt động. Để bot chạy 24/7 và kiểm tra điểm định kỳ:
-1. Đăng ký [cron-job.org](https://cron-job.org).
-2. Tạo Job 1 (Giữ thức): Chạy mỗi **14 phút**, trỏ vào link `https://my-bot-lms.onrender.com/ping`.
-3. Tạo Job 2 (Kiểm tra điểm/deadline): Chạy mỗi **2 giờ**, trỏ vào link `https://my-bot-lms.onrender.com/sync`.
+1. Đăng nhập vào VPS của bạn qua SSH.
+2. Clone code về:
+   ```bash
+   git clone https://github.com/jymmy779/iuh_tracker_bot.git
+   cd iuh_tracker_bot
+   ```
+3. Tạo file `.env` và điền thông tin:
+   ```env
+   TELEGRAM_TOKEN=token_cua_ban
+   DATABASE_URL=link_supabase_cua_ban
+   LMS_URL=https://lms.iuh.edu.vn
+   ```
+4. Cài đặt thư viện:
+   ```bash
+   pip install -r requirements.txt
+   ```
+5. Khởi chạy Bot ngầm (chạy mãi mãi ngay cả khi tắt SSH):
+   ```bash
+   nohup python bot.py > bot.log 2>&1 &
+   ```
 
-Vậy là xong! Bot của bạn sẽ chạy 24/7 hoàn toàn miễn phí mà không bao giờ sợ mất dữ liệu.
+Vậy là xong! Bot của bạn sẽ chạy 24/7 hoàn toàn an toàn và không lo bị trường chặn IP nhờ chạy qua mạng của VPS.
+Để xem log, bạn gõ `tail -f bot.log`. Để tắt bot, gõ `pkill -f "python bot.py"`.

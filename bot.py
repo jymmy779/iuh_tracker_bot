@@ -2,13 +2,12 @@ import asyncio
 import logging
 import os
 import time
-from fastapi import FastAPI, Request, Response
 from telegram import Update, BotCommand
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from dotenv import load_dotenv
 
 from db.database import init_db, mark_done, get_user, add_or_update_user, remove_user
-from scheduler import sync_and_notify, sync_user_data
+from scheduler import start_scheduler, sync_user_data
 from tg_bot.formatter import format_deadline_message, get_done_keyboard, format_grades_overview, get_course_grades_keyboard, format_grade_items
 from moodle.auth import get_moodle_token
 from moodle.courses import get_site_info, get_enrolled_courses, get_current_semester_courses
@@ -21,10 +20,6 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-
-app = FastAPI()
-application = None
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -213,14 +208,17 @@ async def fallback_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Hãy gõ `/` để xem danh sách lệnh, ví dụ `/login`, `/deadlines`, `/week`."
     )
 
-@app.on_event("startup")
-async def startup():
-    global application
+async def main():
     if not TOKEN:
-        raise ValueError("Chưa cấu hình TELEGRAM_TOKEN")
+        raise ValueError("Chưa cấu hình TELEGRAM_TOKEN trong .env!")
         
+    logger.info("Đang khởi tạo Database PostgreSQL...")
     await init_db()
     
+    logger.info("Đang khởi động Background Scheduler...")
+    start_scheduler()
+    
+    logger.info("Đang khởi động Telegram Bot (Polling mode)...")
     application = Application.builder().token(TOKEN).build()
     
     application.add_handler(CommandHandler("start", start_command))
@@ -232,9 +230,6 @@ async def startup():
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback_message))
     
-    await application.initialize()
-    await application.start()
-    
     commands = [
         BotCommand("start", "Hướng dẫn sử dụng bot"),
         BotCommand("login", "Đăng nhập LMS"),
@@ -243,35 +238,17 @@ async def startup():
         BotCommand("week", "Xem deadline 7 ngày tới"),
         BotCommand("grades", "Xem điểm học kỳ hiện tại")
     ]
+    
     await application.bot.set_my_commands(commands)
     
-    if WEBHOOK_URL:
-        webhook_path = f"{WEBHOOK_URL}/telegram"
-        await application.bot.set_webhook(webhook_path)
-        logger.info(f"Đã set Webhook tại: {webhook_path}")
-    else:
-        logger.warning("Không có WEBHOOK_URL. Telegram Webhook chưa được thiết lập!")
+    # Xóa webhook nếu lỡ có lưu từ trước
+    await application.bot.delete_webhook()
+    
+    # Chạy bot bằng phương thức Polling
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
-@app.on_event("shutdown")
-async def shutdown():
-    if application:
-        await application.stop()
-        await application.shutdown()
-
-@app.post("/telegram")
-async def telegram_webhook(request: Request):
-    if not application:
-        return Response(status_code=500)
-    data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
-    return Response(status_code=200)
-
-@app.get("/ping")
-async def ping():
-    return {"status": "ok", "message": "Bot is awake"}
-
-@app.get("/sync")
-async def sync_endpoint():
-    asyncio.create_task(sync_and_notify())
-    return {"status": "ok", "message": "Sync job triggered"}
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot đã bị dừng.")
