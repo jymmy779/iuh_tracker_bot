@@ -69,7 +69,7 @@ Dự án hoạt động xoay quanh 2 luồng chính:
 
 ---
 
-## 🚀 4. Hướng dẫn Deploy lên Render & Supabase (Miễn phí 100%)
+## 🚀 4. Hướng dẫn Deploy (Miễn phí 100%)
 
 Phiên bản này được thiết kế theo chuẩn Cloud-Native, sử dụng Webhook và PostgreSQL, rất thích hợp để host trên Render (hoặc Koyeb/Railway) kết hợp với Supabase.
 
