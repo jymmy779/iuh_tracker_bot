@@ -90,7 +90,6 @@ Code đã được tối ưu siêu nhẹ để chạy ngầm trên VPS (Polling 
 3. Tạo file `.env` và điền thông tin:
    ```env
    TELEGRAM_TOKEN=token_cua_ban
-   DATABASE_URL=link_supabase_cua_ban
    LMS_URL=https://lms.iuh.edu.vn
    ```
 4. Cài đặt thư viện:
