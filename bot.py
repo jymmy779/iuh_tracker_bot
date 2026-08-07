@@ -125,7 +125,9 @@ async def week_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id, token, lms_userid = await require_login(update)
     if not token: return
     
-    await update.message.reply_text("⏳ Đang kiểm tra deadline trong 7 ngày tới...")
+    await update.message.reply_text("⏳ Đang đồng bộ và kiểm tra deadline trong 7 ngày tới...")
+    await sync_user_data(chat_id, token, lms_userid, notify=False)
+    
     current_time = int(time.time())
     week_later = current_time + (7 * 24 * 3600)
     

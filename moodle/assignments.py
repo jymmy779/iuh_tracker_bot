@@ -69,9 +69,59 @@ async def check_submission_status(assign_id: int, token: str) -> bool:
             submission = last_attempt.get("submission", {})
             status = submission.get("status", "")
             
+            logger.info(f"AssignID {assign_id} status: {status}, full submission data: {submission}")
+            
             # Nếu status là 'submitted' hoặc 'graded' (đã chấm điểm)
-            return status in ["submitted", "graded"]
+            # Hoặc có plugin file/onlinetext được upload mà chưa bấm submit (draft) nhưng user coi như đã nộp
+            is_done = status in ["submitted", "graded", "draft"]
+            
+            # Nếu có điểm thì chắc chắn là nộp rồi
+            grading_status = last_attempt.get("gradingstatus", "")
+            if grading_status in ["graded"]:
+                is_done = True
+                
+            logger.info(f"AssignID {assign_id} is_done: {is_done}")
+            return is_done
             
     except Exception as e:
         logger.error(f"Lỗi kết nối khi check status {assign_id}: {e}")
         return False
+
+async def get_activity_completion_statuses(course_id: int, user_id: int, token: str) -> Dict[int, bool]:
+    """
+    Lấy danh sách trạng thái completion (đánh dấu hoàn thành) của các activity trong một khoá học.
+    Trả về dictionary map cmid -> bool (is_completed)
+    """
+    url = f"{LMS_URL}/webservice/rest/server.php"
+    
+    params = {
+        "wstoken": token,
+        "wsfunction": "core_completion_get_activities_completion_status",
+        "moodlewsrestformat": "json",
+        "courseid": course_id,
+        "userid": user_id
+    }
+    
+    try:
+        async with get_lms_client(timeout=30.0) as client:
+            response = await client.get(url, params=params, timeout=10.0)
+            response.raise_for_status()
+            data = response.json()
+            
+            if isinstance(data, dict) and "exception" in data:
+                # Có thể khoá học không bật tính năng completion
+                return {}
+                
+            result = {}
+            statuses = data.get("statuses", [])
+            for item in statuses:
+                cmid = item.get("cmid")
+                state = item.get("state", 0)
+                # state > 0 (1: complete, 2: complete pass, 3: complete fail)
+                if cmid is not None:
+                    result[cmid] = (state > 0)
+                    
+            return result
+    except Exception as e:
+        logger.error(f"Lỗi lấy completion status course {course_id}: {e}")
+        return {}

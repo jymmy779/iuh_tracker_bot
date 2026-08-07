@@ -26,6 +26,11 @@ async def sync_user_data(chat_id: int, token: str, lms_userid: int, notify: bool
         
         assignments = await get_assignments(course_ids, token)
         
+        from moodle.assignments import get_activity_completion_statuses
+        completion_cache = {}
+        for cid in course_ids:
+            completion_cache[cid] = await get_activity_completion_statuses(cid, lms_userid, token)
+        
         current_time = int(time.time())
         bot = Bot(token=os.getenv("TELEGRAM_TOKEN"))
         
@@ -43,18 +48,23 @@ async def sync_user_data(chat_id: int, token: str, lms_userid: int, notify: bool
                     continue
                     
                 # Kiểm tra xem đã có trong DB chưa
-                row = await db.fetchrow("SELECT id FROM assignments WHERE id = $1 AND chat_id = $2", cmid, chat_id)
+                row = await db.fetchrow("SELECT id, is_done FROM assignments WHERE id = $1 AND chat_id = $2", cmid, chat_id)
                 
                 if not row:
+                    from moodle.assignments import check_submission_status
+                    # Kiểm tra xem đã nộp trên LMS chưa (cả submission lẫn activity completion)
+                    is_submitted = await check_submission_status(assign["id"], token)
+                    is_activity_done = completion_cache.get(course_id, {}).get(cmid, False)
+                    is_done = is_submitted or is_activity_done
                     # Deadline mới! Lưu vào DB
                     await db.execute(
-                        "INSERT INTO assignments (id, chat_id, name, course_name, duedate, is_done) VALUES ($1, $2, $3, $4, $5, FALSE)",
-                        cmid, chat_id, name, course_name, duedate
+                        "INSERT INTO assignments (id, chat_id, name, course_name, duedate, is_done) VALUES ($1, $2, $3, $4, $5, $6)",
+                        cmid, chat_id, name, course_name, duedate, is_done
                     )
-                    logger.info(f"Đã thêm deadline mới: {name} cho user {chat_id}")
+                    logger.info(f"Đã thêm deadline mới: {name} cho user {chat_id} (is_done={is_done})")
                     
-                    # Thông báo
-                    if notify:
+                    # Thông báo nếu chưa nộp
+                    if notify and not is_done:
                         msg = format_deadline_message(
                             {"name": name, "duedate": duedate, "cmid": cmid},
                             course_name
@@ -70,6 +80,18 @@ async def sync_user_data(chat_id: int, token: str, lms_userid: int, notify: bool
                                 )
                             except Exception as e:
                                 logger.error(f"Lỗi gửi tin nhắn tới {chat_id}: {e}")
+                else:
+                    # Đã có trong DB, nếu đang chưa nộp thì check lại trên LMS
+                    if not row["is_done"]:
+                        from moodle.assignments import check_submission_status
+                        is_submitted = await check_submission_status(assign["id"], token)
+                        is_activity_done = completion_cache.get(course_id, {}).get(cmid, False)
+                        if is_submitted or is_activity_done:
+                            await db.execute(
+                                "UPDATE assignments SET is_done = TRUE WHERE id = $1 AND chat_id = $2",
+                                cmid, chat_id
+                            )
+                            logger.info(f"Đã tự động đánh dấu hoàn thành deadline: {name} cho user {chat_id}")
     except Exception as e:
         logger.error(f"Lỗi đồng bộ dữ liệu cho {chat_id}: {e}")
 
